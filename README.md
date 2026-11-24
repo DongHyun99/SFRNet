@@ -13,7 +13,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2610.05325-b31b1b.svg)](https://arxiv.org/abs/2610.05325)
 [![Journal](https://img.shields.io/badge/Multimedia_Systems-10.1007%2Fs00530--025--02036--5-blue.svg)](https://doi.org/10.1007/s00530-025-02036-5)
 [![Weights](https://img.shields.io/badge/%F0%9F%A4%97_Hugging_Face-Weights-yellow.svg)](https://huggingface.co/Donghyun99/SFRNet)
-[![Project Page](https://img.shields.io/badge/Project_Page-SFR--Net-2ea44f.svg?logo=googlechrome&logoColor=white)](https://donghyun99.github.io/SFRNet/)
+[![Project Page](https://img.shields.io/badge/Project_Page-SFR--Net-2ea44f.svg)](https://donghyun99.github.io/SFRNet/)
 
 </div>
 
