@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <meta name="title" content="Shadow Feature Refinement Network: Progressive Feature Refinement based on Knowledge Distillation for Effective Shadow Removal">
-  <meta name="description" content="SFR-Net removes shadows with a LaMa-based inpainting generator, distills the features of a frozen network that sees the shadow-free image, and restores colors with a linear-regression post-processing.">
+  <meta name="description" content="SFR-Net removes shadows with an image inpainting network trained by knowledge distillation from a guiding network that reconstructs the shadow-free image, followed by a linear-regression color restoration.">
   <meta name="keywords" content="SFR-Net, shadow removal, knowledge distillation, feature refinement, image inpainting, LaMa, ISTD+, SRD, Multimedia Systems">
   <meta name="author" content="Donghyun Han, Byoung-dai Lee">
   <meta name="robots" content="index, follow">
@@ -35,11 +35,15 @@
   <link rel="stylesheet" href="static/css/index.css">
   <link rel="stylesheet" href="static/css/project.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.css">
   <link href="https://fonts.googleapis.com/css?family=Google+Sans" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <script defer src="static/js/fontawesome.all.min.js"></script>
   <script defer src="static/js/index.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\(', right: '\\)', display: false}], throwOnError: false});"></script>
 </head>
 <body>
 
@@ -63,7 +67,7 @@
             </div>
 
             <div class="is-size-5 publication-authors">
-              <span class="author-block"><sup>1</sup>Kyonggi University, South Korea</span>
+              <span class="author-block"><sup>1</sup>Kyonggi University, Korea</span>
               <br>
               <a href="https://doi.org/10.1007/s00530-025-02036-5" target="_blank" class="venue-link">
                 <b>Multimedia Systems 31, 449 (2025)</b>
@@ -105,29 +109,30 @@
     </div>
   </section>
 
-  <!-- Teaser + TL;DR -->
-  <section class="hero teaser">
+  <nav class="page-nav" aria-label="Sections">
+    <a href="#abstract">Abstract</a>
+    <a href="#method">Method</a>
+    <a href="#experiments">Experiments</a>
+    <a href="#ablation">Ablation Study</a>
+    <a href="#post-processing">Post-Processing</a>
+    <a href="#conclusion">Conclusion</a>
+    <a href="#BibTeX">BibTeX</a>
+  </nav>
+
+  <!-- Overview figure -->
+  <section class="section">
     <div class="container is-max-desktop">
-      <div class="hero-body">
-        <div class="figure-block">
-          <img src="assets/figures/fig4.svg" alt="Qualitative comparison of SFR-Net and state-of-the-art shadow removal methods on ISTD+">
-          <p class="figure-caption">
-            ISTD+ results. Columns from left to right: input, ShadowDiffusion, HomoFormer, ShadowFormer, BMNet,
-            <b>SFR-Net (ours)</b>, InstanceShadowDiffusion, ground truth.
-          </p>
-        </div>
-        <p class="tldr has-text-centered">
-          Shadow removal is close to inpainting, but the shadowed pixels still carry information.
-          <b>SFR-Net</b> starts from a pretrained inpainting network, <b>distills the deep features of a frozen network that
-          sees the shadow-free image</b> into the network that sees the shadow image, and <b>restores the global colors</b>
-          with a per-image linear regression.
+      <div class="figure-block w-80">
+        <img src="assets/figures/fig1.svg" alt="Network architecture of SFR-Net">
+        <p class="figure-caption">
+          <span class="fig-no">Figure 1.</span> Network architecture of the proposed shadow feature refinement network.
         </p>
       </div>
     </div>
   </section>
 
   <!-- Abstract -->
-  <section class="section hero is-light">
+  <section id="abstract" class="section hero is-light">
     <div class="container is-max-desktop">
       <div class="columns is-centered has-text-centered">
         <div class="column is-four-fifths">
@@ -152,21 +157,35 @@
     </div>
   </section>
 
-  <!-- Motivation -->
+  <!-- Introduction -->
   <section class="section">
     <div class="container is-max-desktop">
-      <h2 class="title is-3">Why Is Shadow Removal Hard?</h2>
+      <h2 class="title is-3">Introduction</h2>
       <div class="content has-text-justified">
         <p>
-          A shadow changes the illumination of a region non-uniformly, which alters its texture and colors, and its penumbra
-          makes the boundary hard to define. Image inpainting models already reconstruct masked regions from their context,
-          but they discard the masked pixels. In addition, the shadow and ground-truth images of a dataset are captured at
-          different times, so a model that fits the ground truth also learns <i>global</i> color changes caused by lighting,
-          and its output drifts away from the colors of the input image.
+          Shadows cause non-uniform lighting that changes the texture and colors of the shadowed region, and the penumbra
+          makes the shadow boundary hard to define. Shadow removal therefore has to estimate and restore the colors of the
+          shadowed region from those of the non-shadowed region. Image inpainting models are good at this kind of
+          context-aware reconstruction, and a pretrained inpainting network that receives the shadow-free image produces
+          features that describe what the shadowed region should look like.
         </p>
-      </div>
-      <div class="question-callout has-text-centered">
-        Can a shadow remover learn the internal representation of a network that already sees the shadow-free image?
+        <p>
+          SFR-Net builds on this observation with two image generation networks derived from an inpainting model. The
+          <b>guided network \(G_S\)</b> receives the shadow image \(I_S\) and its shadow mask \(M_S\) and removes the shadow.
+          The <b>guiding network \(G_I\)</b> has the same structure, receives the ground-truth image \(I_{gt}\) with an empty
+          mask \(M_{gt}\), and reconstructs \(I_{gt}\). The features generated at each layer of \(G_I\) supervise the
+          corresponding layer of \(G_S\).
+        </p>
+        <p>The main contributions of this study are as follows.</p>
+        <ul class="contribution-list">
+          <li>A supervised shadow removal model that combines image inpainting and knowledge distillation, with two
+            inpainting-based generator architectures and loss functions for efficient learning.</li>
+          <li>A post-processing step that learns the correlation between the pixels of the shadow image and the
+            shadow-removed image in the non-shadow region and corrects the pixel values of the entire image, so the overall
+            colors match those of the original image.</li>
+          <li>Extensive experiments on the public ISTD+ and SRD datasets, showing performance comparable to state-of-the-art
+            methods.</li>
+        </ul>
       </div>
     </div>
   </section>
@@ -175,122 +194,203 @@
   <section id="method" class="section hero is-light">
     <div class="container is-max-desktop">
       <h2 class="title is-3">Method</h2>
-      <div class="figure-block narrow">
-        <img src="assets/figures/fig1.svg" alt="Network architecture of SFR-Net" loading="lazy">
-        <p class="figure-caption">
-          Network architecture of SFR-Net. The frozen guiding network G<sub>I</sub> reconstructs the ground truth from an
-          empty mask; the guided network G<sub>S</sub> removes shadows from the shadow image and its mask, and its deep
-          features are refined toward those of G<sub>I</sub>.
+
+      <h3 class="subsection">Shadow Feature Refinement Network</h3>
+      <div class="content has-text-justified">
+        <p>
+          SFR-Net is a generative adversarial network with two generators and one discriminator. The pretrained \(G_I\)
+          takes \(I_{gt}\) and the empty mask \(M_{gt}\) and reconstructs \(I'_{gt}\); \(G_S\) takes \(I_S\) and \(M_S\) and
+          generates the shadow-free image \(I_{sf}\) while comparing its intermediate features with those of \(G_I\). Both
+          generators are LaMa networks built from fast Fourier convolution (FFC) blocks, which let the network use
+          image-wide context from the first layers. The discriminator is the patch-based discriminator of Pix2PixHD.
+          Finally, a post-processing step restores the colors of \(I_{sf}\) to produce the final output \(I_{sf\text{-}pp}\).
         </p>
       </div>
-      <div class="columns is-multiline">
-        <div class="column is-one-third">
-          <div class="component-card">
-            <h3>Guiding &amp; Guided Networks</h3>
-            <p>
-              Both are the LaMa inpainting generator: three downsampling layers, 18 fast Fourier convolution (FFC) residual
-              blocks, and three upsampling layers. <b>G<sub>I</sub></b> is pretrained and frozen and receives
-              I<sub>gt</sub> ⊕ M<sub>gt</sub>; <b>G<sub>S</sub></b> receives the shadow image and its mask,
-              I<sub>s</sub> ⊕ M<sub>s</sub>, and is trained adversarially against a patch discriminator.
-            </p>
-          </div>
-        </div>
-        <div class="column is-one-third">
-          <div class="component-card">
-            <h3>Feature Refinement Loss</h3>
-            <p>
-              L<sub>fr</sub> is the mean L2 distance between the activations of G<sub>I</sub> and G<sub>S</sub> over a set
-              of target layers. G<sub>S</sub> thus learns the representation G<sub>I</sub> uses to reconstruct the
-              shadow-free image. Applying it to the <b>deep stage</b> (the last six FFC blocks) works best.
-            </p>
-          </div>
-        </div>
-        <div class="column is-one-third">
-          <div class="component-card">
-            <h3>Color Restoration</h3>
-            <p>
-              The input and the result should agree outside the shadow. For each RGB channel, a linear regression
-              I<sub>s</sub> = β<sub>0</sub> + β<sub>1</sub>·I<sub>sf</sub> is fitted on the non-shadow pixels and applied
-              to the whole output, giving I<sub>sf-pp</sub> in under 0.07 s per image.
-            </p>
-          </div>
-        </div>
-      </div>
-      <div class="equation">
-        L = 10·L<sub>Adv</sub> + 30·L<sub>HRFPL</sub> + 100·L<sub>DiscPL</sub> + 10·L<sub>mix</sub> + 100·L<sub>fr</sub> + 0.001·R1
+      <div class="figure-block w-80">
+        <img src="assets/figures/fig2.svg" alt="Architecture of the FFC block and spectral transform" loading="lazy">
+        <p class="figure-caption">
+          <span class="fig-no">Figure 2.</span> Architecture of the FFC block and spectral transform. The Fourier unit
+          (FU) captures global structure in the frequency domain, and the local Fourier unit (LFU) splits the feature map
+          into four quadrants to enhance local detail.
+        </p>
       </div>
       <div class="content has-text-justified">
         <p>
-          Besides L<sub>fr</sub>, G<sub>S</sub> is trained with a non-saturating adversarial loss, a high receptive field
-          perceptual loss (L<sub>HRFPL</sub>) computed with an ADE20k ResNet-50, discriminator feature matching
-          (L<sub>DiscPL</sub>), and a mix loss that combines MS-SSIM and L1 (γ<sub>mix</sub> = 0.025).
+          The guided network \(G_S\) consists of four FFC-based downscale layers, two FFC layers, 18 FFC residual blocks
+          with skip connections, and four FFC-based upscale layers.
         </p>
       </div>
-      <div class="figure-block narrow">
-        <img src="assets/figures/fig2.svg" alt="Architecture of the FFC block and spectral transform" loading="lazy">
-        <p class="figure-caption">The FFC block processes local features with convolutions and global features with a spectral transform (Fourier unit and local Fourier unit).</p>
+
+      <h3 class="subsection">Loss Function</h3>
+      <div class="content has-text-justified">
+        <p>The overall objective combines five losses and an R1 gradient penalty:</p>
+      </div>
+      <div class="equation">
+        $$\mathcal{L} = \alpha\,\mathcal{L}_{Adv} + \beta\,\mathcal{L}_{HRFPL} + \gamma\,\mathcal{L}_{fm} + \delta\,\mathcal{L}_{mix} + \lambda_{fr}\,\mathcal{L}_{fr} + \zeta\,R_1 \tag{1}$$
+      </div>
+      <div class="content has-text-justified">
+        <p>with \(\alpha = 10\), \(\beta = 30\), \(\gamma = 100\), \(\delta = 10\), \(\lambda_{fr} = 100\), and \(\zeta = 0.001\).</p>
+
+        <h4 class="paragraph-title">Adversarial loss</h4>
+        <p>
+          The patch discriminator is supervised separately inside and outside the shadow. Each image is divided into
+          \(N\) patches, and \(M_{S,i} \in \{0, 1\}\) indicates whether patch \(i\) belongs to the shadow region. Shadow
+          patches are expected to be changed by the generator and are classified as fake, while non-shadow patches should
+          match the target and are classified as real. A non-saturating
+          adversarial loss with stop gradients \(\mathrm{sg}\) minimizes both the discriminator and generator losses:
+        </p>
+      </div>
+      <div class="equation">
+        $$\mathcal{L}_D = \frac{1}{N}\sum_{i=1}^{N}\Big[-\log D_i(I_{gt}) - M_{S,i}\log\big(1 - D_i(I_{sf})\big) - (1 - M_{S,i})\log D_i(I_{sf})\Big] \tag{2}$$
+        $$\mathcal{L}_G = -\mathbb{E}\big[\log D(I_{sf})\big] \tag{3}$$
+        $$\mathcal{L}_{Adv} = \mathrm{sg}_\theta(\mathcal{L}_D) + \mathrm{sg}_\xi(\mathcal{L}_G) \longrightarrow \min_{\theta,\xi} \tag{4}$$
+      </div>
+
+      <div class="content has-text-justified">
+        <h4 class="paragraph-title">High receptive field perceptual loss and discriminator feature matching</h4>
+        <p>
+          \(\mathcal{L}_{HRFPL}\) compares features of a pretrained ResNet with a high receptive field, \(\phi^{HRF}_j\), and
+          \(\mathcal{L}_{fm}\) compares the intermediate features \(D_j\) of the discriminator, which is trained on the same
+          data domain:
+        </p>
+      </div>
+      <div class="equation">
+        $$\mathcal{L}_{HRFPL} = \sum_{j \in \mathcal{L}} \frac{1}{C_j H_j W_j}\big\lVert \phi^{HRF}_j(I_{gt}) - \phi^{HRF}_j(I_{sf}) \big\rVert_2 \tag{5}$$
+        $$\mathcal{L}_{fm} = \sum_{j \in \mathcal{L}} \frac{1}{C_j H_j W_j}\big\lVert D_j(I_{gt}) - D_j(I_{sf}) \big\rVert_2 \tag{6}$$
+      </div>
+
+      <div class="content has-text-justified">
+        <h4 class="paragraph-title">Mix loss</h4>
+        <p>
+          L1 compares pixels independently, while the human visual system is more sensitive to luminance, contrast, and
+          structure. The mix loss combines MS-SSIM, computed per \(35 \times 35\) patch \(P\) around its center pixel
+          \(\tilde{p}\) with Gaussian filters of \(\sigma_G \in \{0.5, 1, 2, 4, 8\}\), with a Gaussian-weighted L1 loss:
+        </p>
+      </div>
+      <div class="equation">
+        $$\mathcal{L}_{ms\text{-}ssim}(P) = 1 - \text{MS-SSIM}(\tilde{p}) = 1 - l_M^{\alpha}(\tilde{p})\cdot\prod_{j=1}^{M} cs_j^{\beta_j}(\tilde{p}) \tag{10}$$
+        $$\mathcal{L}_{mix} = \gamma_{mix}\cdot\mathcal{L}_{ms\text{-}ssim} + (1 - \gamma_{mix})\cdot G_{\sigma_G^M}\cdot\mathcal{L}_{1} \tag{11}$$
+      </div>
+      <div class="content has-text-justified">
+        <p>with \(\alpha = \beta_j = 1\) and \(\gamma_{mix} = 0.025\), which is distinct from the loss weight \(\gamma\) in Eq. (1).</p>
+
+        <h4 class="paragraph-title">Feature refinement loss</h4>
+        <p>
+          The guided network learns the image representation that the guiding network uses to reconstruct \(I_{gt}\). The
+          activations of \(G_S\) and \(G_I\) at a set of target layers \(\mathcal{L}\) are compared with the L2 distance:
+        </p>
+      </div>
+      <div class="equation">
+        $$\mathcal{L}_{fr} = \frac{1}{N}\sum_{l \in \mathcal{L}} \frac{1}{C_l H_l W_l}\big\lVert G_I^{l}(I_{gt} \oplus M_{gt}) - G_S^{l}(I_S \oplus M_S) \big\rVert_2 \tag{12}$$
+      </div>
+      <div class="content has-text-justified">
+        <p>
+          where \(N\) is the number of target layers and \(\oplus\) denotes channel concatenation. With
+          \(\mathcal{L}_{fr}\), the feature maps of \(G_S\) carry more diverse and richer information (Figure 3).
+        </p>
+      </div>
+      <div class="figure-block w-80">
+        <img src="assets/figures/fig3.svg" alt="Feature maps of the 20th FFC block without and with the feature refinement loss" loading="lazy">
+        <p class="figure-caption">
+          <span class="fig-no">Figure 3.</span> Feature maps of the 20th FFC block of SFR-Net (a) without and (b) with
+          \(\mathcal{L}_{fr}\).
+        </p>
+      </div>
+
+      <h3 class="subsection">Post-Processing for Color Restoration</h3>
+      <div class="content has-text-justified">
+        <p>
+          The shadow and ground-truth images of a dataset are captured under slightly different conditions, so the model also
+          learns global color changes and alters the overall color of its output. Because \(I_S\) is \(I_{gt}\) with a
+          shadow cast on it, the non-shadow region of \(I_{sf}\) should have the colors of \(I_S\). SFR-Net therefore fits
+          a per-image linear regression on the non-shadow pixels, separately for R, G, and B, and applies it to the whole
+          image:
+        </p>
+      </div>
+      <div class="equation">
+        $$I_S \odot (1 - M_S) = \beta_0 + \beta_1 \cdot \big(I_{sf} \odot (1 - M_S)\big) \tag{13}$$
+        $$I_{sf\text{-}pp} = \beta_0 + \beta_1 \cdot I_{sf} \tag{14}$$
       </div>
     </div>
   </section>
 
-  <!-- Results -->
-  <section id="results" class="section">
+  <!-- Experiments -->
+  <section id="experiments" class="section">
     <div class="container is-max-desktop">
-      <h2 class="title is-3">Main Results</h2>
-      <div class="stat-row">
-        <div class="stat"><div class="value">3.46</div><div class="label">RMSE on the whole image, ISTD+</div></div>
-        <div class="stat"><div class="value">4.98</div><div class="label">RMSE in the shadow region on ISTD+, the lowest among the compared methods</div></div>
-        <div class="stat"><div class="value">4.38</div><div class="label">RMSE on the whole image, SRD</div></div>
-        <div class="stat"><div class="value">−14.4%</div><div class="label">whole-image RMSE on ISTD+ from adding L<sub>fr</sub> (4.29 → 3.67, before post-processing)</div></div>
-      </div>
+      <h2 class="title is-3">Experiments</h2>
+
+      <h3 class="subsection">Experimental Setup</h3>
       <div class="content">
+        <ul class="setup-list">
+          <li><b>ISTD+</b>: 1,330 training and 540 test triplets (shadow image, shadow-free image, mask) at 640×480.</li>
+          <li><b>SRD</b>: 3,088 image pairs without ground-truth masks; images are resized to 640×480 and masks predicted
+            by DHAN are used for training and evaluation.</li>
+          <li><b>Metrics</b>: RMSE in LAB color space, and PSNR and SSIM in RGB, for the shadow, non-shadow, and whole
+            image regions, computed with the widely used MATLAB evaluation code.</li>
+          <li><b>Implementation</b>: PyTorch 2.0, one NVIDIA Tesla A100 GPU, batch size 4, Adam and Lion optimizers,
+            learning rate \(10^{-3}\) for the generator and \(10^{-4}\) for the discriminator.</li>
+        </ul>
+      </div>
+
+      <h3 class="subsection">Comparison with State-of-the-Art Methods</h3>
+      <div class="content has-text-justified">
         <p>
-          All methods are evaluated at 640×480. RMSE is computed in LAB color space, SSIM and PSNR in RGB.
-          <b>Bold</b> and <u>underline</u> mark the best and second-best results. For SRD, which has no ground-truth
-          masks, shadow masks predicted by DHAN are used for training and evaluation.
+          On ISTD+, SFR-Net achieves the lowest shadow-region RMSE among the compared methods, reducing it from 5.0098
+          (HomoFormer) to 4.9750, and ranks second in shadow-region PSNR, non-shadow SSIM and PSNR, and whole-image RMSE and
+          PSNR. All baseline numbers are the official results of the respective studies; SP+M+I Net and FusionNet
+          output \(256 \times 256\) images, which are resized to \(640 \times 480\). On SRD, it records an RMSE of 3.5184 in the shadow region and 4.3781 on the whole image.
+          <b>Bold</b> and <u>underline</u> mark the best and second-best results.
         </p>
       </div>
-      <p class="table-caption">ISTD+</p>
+      <p class="table-caption"><span class="fig-no">Table 1.</span> Quantitative comparison on the ISTD+ dataset.</p>
       <div class="results-table-wrapper">
 <table class="results-table">
 <thead>
-  <tr><th rowspan="2">Method</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th></tr>
-  <tr><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th></tr>
+<tr><th rowspan="2">Method</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th></tr>
+<tr><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th></tr>
 </thead>
 <tbody>
 <tr class="reference"><td>Shadow Image</td><td>30.4831</td><td>0.9265</td><td>20.8095</td><td>3.1493</td><td>0.9552</td><td>33.8855</td><td>12.4080</td><td>0.8747</td><td>20.2209</td></tr>
-<tr class="group-start"><td>DHAN</td><td>8.6784</td><td>0.9833</td><td>32.4535</td><td>6.7880</td><td>0.9433</td><td>26.2158</td><td>7.2224</td><td>0.9244</td><td>24.8628</td></tr>
-<tr><td>SP+M+I Net (resize)</td><td>6.2019</td><td>0.9774</td><td>35.7971</td><td>4.3615</td><td>0.9071</td><td>30.8697</td><td>4.7650</td><td>0.8800</td><td>29.1754</td></tr>
-<tr><td>FusionNet (resize)</td><td>6.6084</td><td>0.9605</td><td>34.7492</td><td>4.6387</td><td>0.8038</td><td>29.1078</td><td>5.0445</td><td>0.7567</td><td>27.6059</td></tr>
-<tr><td>SG-ShadowNet</td><td>6.0283</td><td>0.9844</td><td>35.9620</td><td>3.7969</td><td>0.9503</td><td>32.7644</td><td>4.2651</td><td>0.9304</td><td>30.5036</td></tr>
-<tr><td>BMNet</td><td>5.5477</td><td class="best">0.9865</td><td>36.8070</td><td class="second">2.9791</td><td class="best">0.9576</td><td>34.4725</td><td>3.5375</td><td class="best">0.9410</td><td>31.8521</td></tr>
-<tr><td>ShadowFormer</td><td>5.0755</td><td class="second">0.9864</td><td class="best">38.0692</td><td class="best">2.8663</td><td class="second">0.9550</td><td class="best">35.1463</td><td class="best">3.3461</td><td class="second">0.9387</td><td class="best">32.7827</td></tr>
-<tr><td>Inpaint4Shadow</td><td>6.5203</td><td>0.9621</td><td>35.2136</td><td>4.4683</td><td>0.8234</td><td>29.8008</td><td>4.9124</td><td>0.7783</td><td>28.2474</td></tr>
-<tr><td>ShadowDiffusion</td><td>5.8667</td><td>0.9782</td><td>35.8192</td><td>3.2892</td><td>0.9253</td><td>32.8163</td><td>3.8768</td><td>0.8995</td><td>30.3881</td></tr>
+<tr class="group-start"><td>ShadowDiffusion</td><td>5.8667</td><td>0.9782</td><td>35.8192</td><td>3.2892</td><td>0.9253</td><td>32.8163</td><td>3.8768</td><td>0.8995</td><td>30.3881</td></tr>
 <tr><td>HomoFormer</td><td class="second">5.0098</td><td>0.9840</td><td>37.4862</td><td>3.1282</td><td>0.9350</td><td>33.3300</td><td>3.5245</td><td>0.9161</td><td>31.3985</td></tr>
+<tr><td>Inpaint4Shadow</td><td>6.5203</td><td>0.9621</td><td>35.2136</td><td>4.4683</td><td>0.8234</td><td>29.8008</td><td>4.9124</td><td>0.7783</td><td>28.2474</td></tr>
+<tr><td>ShadowFormer</td><td>5.0755</td><td class="second">0.9864</td><td class="best">38.0692</td><td class="best">2.8663</td><td class="second">0.9550</td><td class="best">35.1463</td><td class="best">3.3461</td><td class="second">0.9387</td><td class="best">32.7827</td></tr>
+<tr><td>BMNet</td><td>5.5477</td><td class="best">0.9865</td><td>36.8070</td><td class="second">2.9791</td><td class="best">0.9576</td><td>34.4725</td><td>3.5375</td><td class="best">0.9410</td><td>31.8521</td></tr>
+<tr><td>SG-ShadowNet</td><td>6.0283</td><td>0.9844</td><td>35.9620</td><td>3.7969</td><td>0.9503</td><td>32.7644</td><td>4.2651</td><td>0.9304</td><td>30.5036</td></tr>
+<tr><td>FusionNet (resize)</td><td>6.6084</td><td>0.9605</td><td>34.7492</td><td>4.6387</td><td>0.8038</td><td>29.1078</td><td>5.0445</td><td>0.7567</td><td>27.6059</td></tr>
+<tr><td>SP+M+I Net (resize)</td><td>6.2019</td><td>0.9774</td><td>35.7971</td><td>4.3615</td><td>0.9071</td><td>30.8697</td><td>4.7650</td><td>0.8800</td><td>29.1754</td></tr>
+<tr><td>DHAN</td><td>8.6784</td><td>0.9833</td><td>32.4535</td><td>6.7880</td><td>0.9433</td><td>26.2158</td><td>7.2224</td><td>0.9244</td><td>24.8628</td></tr>
 <tr><td>InstanceShadowDiffusion</td><td>5.0735</td><td class="best">0.9865</td><td>37.7354</td><td>3.1269</td><td>0.9514</td><td>34.3006</td><td>3.5342</td><td>0.9356</td><td>32.1079</td></tr>
 <tr class="ours"><td>SFR-Net (Ours)</td><td class="best">4.9750</td><td class="best">0.9865</td><td class="second">37.8747</td><td>3.0631</td><td class="second">0.9550</td><td class="second">34.5793</td><td class="second">3.4627</td><td>0.9382</td><td class="second">32.3872</td></tr>
 </tbody>
 </table>
 </div>
-      <p class="table-caption">SRD</p>
+      <div class="figure-block">
+        <img src="assets/figures/fig4.svg" alt="Qualitative comparison on ISTD+" loading="lazy">
+        <p class="figure-caption">
+          <span class="fig-no">Figure 4.</span> Qualitative results on ISTD+. (a) Input, (b) ShadowDiffusion,
+          (c) HomoFormer, (d) ShadowFormer, (e) BMNet, (f) <b>Ours</b>, (g) InstanceShadowDiffusion, (h) GT, from left to right.
+        </p>
+      </div>
+
+      <p class="table-caption"><span class="fig-no">Table 2.</span> Quantitative comparison on the SRD dataset.</p>
       <div class="results-table-wrapper">
 <table class="results-table">
 <thead>
-  <tr><th rowspan="2">Method</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th></tr>
-  <tr><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th></tr>
+<tr><th rowspan="2">Method</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th></tr>
+<tr><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th></tr>
 </thead>
 <tbody>
 <tr class="reference"><td>Shadow Image</td><td>17.3859</td><td>0.8694</td><td>18.7869</td><td>2.7657</td><td>0.9683</td><td>30.2704</td><td>16.3193</td><td>0.8206</td><td>18.0297</td></tr>
-<tr class="group-start"><td>DHAN</td><td>3.9867</td><td>0.9622</td><td>31.6425</td><td>2.5106</td><td>0.9405</td><td>30.6378</td><td>5.2274</td><td>0.8821</td><td>27.5300</td></tr>
-<tr><td>FusionNet (resize)</td><td>4.2753</td><td>0.9569</td><td>31.4184</td><td>2.9092</td><td>0.9277</td><td>29.7585</td><td>5.8187</td><td>0.8606</td><td>26.9399</td></tr>
-<tr><td>SG-ShadowNet</td><td>3.7124</td><td>0.9733</td><td>32.5460</td><td class="second">1.9659</td><td class="second">0.9748</td><td class="best">33.9631</td><td>4.4926</td><td>0.9340</td><td>29.6179</td></tr>
-<tr><td>BMNet</td><td>3.6952</td><td>0.9656</td><td>32.3086</td><td>2.3587</td><td>0.9449</td><td>31.0833</td><td>4.8848</td><td>0.8889</td><td>27.9986</td></tr>
-<tr><td>ShadowFormer</td><td>3.5833</td><td class="second">0.9739</td><td>33.0057</td><td class="best">1.9617</td><td class="best">0.9758</td><td>33.7010</td><td>4.4366</td><td class="best">0.9374</td><td class="second">29.6462</td></tr>
-<tr><td>Inpaint4Shadow</td><td>3.8828</td><td>0.9713</td><td>32.2222</td><td>2.1370</td><td>0.9739</td><td>32.7109</td><td>4.8368</td><td>0.9324</td><td>28.7194</td></tr>
-<tr><td>ShadowDiffusion</td><td>4.1636</td><td>0.9662</td><td>31.7264</td><td>2.5340</td><td>0.9651</td><td>31.2735</td><td>5.3763</td><td>0.9222</td><td>27.8394</td></tr>
+<tr class="group-start"><td>ShadowDiffusion</td><td>4.1636</td><td>0.9662</td><td>31.7264</td><td>2.5340</td><td>0.9651</td><td>31.2735</td><td>5.3763</td><td>0.9222</td><td>27.8394</td></tr>
 <tr><td>HomoFormer</td><td class="best">3.4217</td><td>0.9676</td><td>33.1020</td><td>2.2344</td><td>0.9502</td><td>31.9545</td><td>4.5635</td><td>0.8988</td><td>28.8686</td></tr>
+<tr><td>Inpaint4Shadow</td><td>3.8828</td><td>0.9713</td><td>32.2222</td><td>2.1370</td><td>0.9739</td><td>32.7109</td><td>4.8368</td><td>0.9324</td><td>28.7194</td></tr>
+<tr><td>ShadowFormer</td><td>3.5833</td><td class="second">0.9739</td><td>33.0057</td><td class="best">1.9617</td><td class="best">0.9758</td><td>33.7010</td><td>4.4366</td><td class="best">0.9374</td><td class="second">29.6462</td></tr>
+<tr><td>BMNet</td><td>3.6952</td><td>0.9656</td><td>32.3086</td><td>2.3587</td><td>0.9449</td><td>31.0833</td><td>4.8848</td><td>0.8889</td><td>27.9986</td></tr>
+<tr><td>SG-ShadowNet</td><td>3.7124</td><td>0.9733</td><td>32.5460</td><td class="second">1.9659</td><td class="second">0.9748</td><td class="best">33.9631</td><td>4.4926</td><td>0.9340</td><td>29.6179</td></tr>
+<tr><td>FusionNet (resize)</td><td>4.2753</td><td>0.9569</td><td>31.4184</td><td>2.9092</td><td>0.9277</td><td>29.7585</td><td>5.8187</td><td>0.8606</td><td>26.9399</td></tr>
 <tr><td>InstanceShadowDiffusion</td><td>6.1959</td><td>0.9705</td><td class="best">34.1167</td><td>3.6498</td><td>0.9611</td><td>32.4489</td><td class="second">4.4195</td><td>0.9259</td><td>29.4738</td></tr>
+<tr><td>DHAN</td><td>3.9867</td><td>0.9622</td><td>31.6425</td><td>2.5106</td><td>0.9405</td><td>30.6378</td><td>5.2274</td><td>0.8821</td><td>27.5300</td></tr>
 <tr class="ours"><td>SFR-Net (Ours)</td><td class="second">3.5184</td><td class="best">0.9744</td><td class="second">33.1909</td><td>1.9665</td><td>0.9727</td><td class="second">33.7399</td><td class="best">4.3781</td><td class="second">0.9341</td><td class="best">29.8287</td></tr>
 </tbody>
 </table>
@@ -298,163 +398,248 @@
       <div class="figure-block">
         <img src="assets/figures/fig5.svg" alt="Qualitative comparison on SRD" loading="lazy">
         <p class="figure-caption">
-          SRD results. Columns from left to right: input, ShadowDiffusion, HomoFormer, ShadowFormer, BMNet,
-          <b>SFR-Net (ours)</b>, InstanceShadowDiffusion, ground truth.
+          <span class="fig-no">Figure 5.</span> Qualitative results on SRD. (a) Input, (b) ShadowDiffusion,
+          (c) HomoFormer, (d) ShadowFormer, (e) BMNet, (f) <b>Ours</b>, (g) InstanceShadowDiffusion, (h) GT, from left to right.
         </p>
       </div>
+
+      <div class="content has-text-justified">
+        <p>
+          Table 3 measures how well each method preserves the non-shadow region of the original shadow image \(I_S\).
+          SFR-Net has the highest SSIM on both datasets and the best RMSE and PSNR on SRD, while InstanceShadowDiffusion
+          achieves the best RMSE and PSNR on ISTD+.
+        </p>
+      </div>
+      <p class="table-caption"><span class="fig-no">Table 3.</span> Reconstruction of the non-shadow region of the
+        original shadow image \(I_S\).</p>
+      <div class="results-table-wrapper">
+<table class="results-table">
+<thead>
+<tr><th rowspan="2">Method</th><th colspan="3">ISTD+</th><th colspan="3">SRD</th></tr>
+<tr><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th></tr>
+</thead>
+<tbody>
+<tr><td>ShadowDiffusion</td><td>2.495</td><td>0.9424</td><td>34.4869</td><td>2.7020</td><td class="second">0.9755</td><td>30.3506</td></tr>
+<tr><td>HomoFormer</td><td>1.6334</td><td>0.9863</td><td>38.7659</td><td>3.0385</td><td>0.9457</td><td>28.8426</td></tr>
+<tr><td>Inpaint4Shadow</td><td>3.8885</td><td>0.8237</td><td>30.2485</td><td>2.5566</td><td>0.9617</td><td>30.0065</td></tr>
+<tr><td>ShadowFormer</td><td class="second">1.2962</td><td>0.9909</td><td>41.0936</td><td class="second">2.4080</td><td>0.9649</td><td class="second">30.6063</td></tr>
+<tr><td>BMNet</td><td>1.4613</td><td>0.9928</td><td>40.0063</td><td>2.6261</td><td>0.9633</td><td>29.9894</td></tr>
+<tr><td>SG-ShadowNet</td><td>2.5336</td><td>0.9889</td><td>36.6816</td><td>2.5368</td><td>0.9633</td><td>30.5528</td></tr>
+<tr><td>FusionNet (resize)</td><td>4.4263</td><td>0.8033</td><td>29.1979</td><td>3.4363</td><td>0.9254</td><td>28.0174</td></tr>
+<tr><td>SP+M+I Net (resize)</td><td>3.9765</td><td>0.9199</td><td>31.1807</td><td>–</td><td>–</td><td>–</td></tr>
+<tr><td>DHAN</td><td>6.1279</td><td>0.9824</td><td>27.5092</td><td>2.8048</td><td>0.95852</td><td>29.4690</td></tr>
+<tr><td>InstanceShadowDiffusion</td><td class="best">1.2365</td><td class="second">0.9933</td><td class="best">42.9716</td><td>4.9513</td><td>0.9641</td><td>29.4994</td></tr>
+<tr class="ours"><td>SFR-Net (Ours)</td><td>1.6281</td><td class="best">0.9941</td><td class="second">41.8093</td><td class="best">2.3307</td><td class="best">0.9859</td><td class="best">32.8520</td></tr>
+</tbody>
+</table>
+</div>
     </div>
   </section>
 
-  <!-- Where to refine -->
+  <!-- Ablation -->
   <section id="ablation" class="section hero is-light">
     <div class="container is-max-desktop">
-      <h2 class="title is-3">Where Should Features Be Refined?</h2>
-      <div class="figure-block narrow">
-        <img src="assets/figures/fig6.svg" alt="Division of the FFC residual blocks into shallow, middle, and deep stages" loading="lazy">
-        <p class="figure-caption">The 18 FFC residual blocks are split into shallow, middle, and deep stages of six blocks each.</p>
-      </div>
+      <h2 class="title is-3">Ablation Study</h2>
+
+      <h3 class="subsection">Where to Apply Knowledge Distillation</h3>
       <div class="content has-text-justified">
         <p>
-          Applying L<sub>fr</sub> to any stage improves on training without it, and for the same number of refined stages,
-          including the deep stage gives the lowest shadow-region and whole-image RMSE. In early layers, the features of the
-          shadow image and its mask are not yet fused, so matching them to the ground-truth features helps little; in deep
-          layers they are, and refinement toward the guiding network pays off. Results below are on ISTD+ without
-          post-processing.
+          The 18 FFC residual blocks are divided into shallow, middle, and deep stages, and \(\mathcal{L}_{fr}\) is applied
+          to different combinations of them. Every configuration outperforms training without \(\mathcal{L}_{fr}\), and
+          applying it to the deep stage gives the best results. In early layers, the features of \(I_S\) and \(M_S\) have not
+          yet converged, so refinement with the ground-truth features helps little; in deep layers they have, and the
+          features of \(G_S\) gradually become similar to those of the ground-truth image.
         </p>
       </div>
+      <div class="figure-block w-80">
+        <img src="assets/figures/fig6.svg" alt="Division of the FFC residual blocks into three stages" loading="lazy">
+        <p class="figure-caption">
+          <span class="fig-no">Figure 6.</span> Division of layers into three stages for analyzing the effectiveness of
+          knowledge distillation.
+        </p>
+      </div>
+      <p class="table-caption"><span class="fig-no">Table 4.</span> \(\mathcal{L}_{fr}\) applied to each stage (ISTD+,
+        without post-processing).</p>
       <div class="results-table-wrapper">
 <table class="results-table">
 <thead>
-  <tr><th rowspan="2">L<sub>fr</sub> stage</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th></tr>
-  <tr><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th></tr>
+<tr><th rowspan="2">Configuration</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th></tr>
+<tr><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th></tr>
 </thead>
 <tbody>
-<tr><td>Config. #1 (Shallow)</td><td>6.0479</td><td>0.9852</td><td>35.9776</td><td>3.6449</td><td>0.9515</td><td>32.5604</td><td>4.1722</td><td>0.9332</td><td>30.2424</td></tr>
-<tr><td>Config. #2 (Middle)</td><td>5.5084</td><td class="second">0.9858</td><td>36.8616</td><td>3.4796</td><td class="second">0.9542</td><td>33.7787</td><td>3.9229</td><td class="second">0.9369</td><td>31.4653</td></tr>
-<tr class="ours"><td>Config. #3 (Deep)</td><td class="best">5.2107</td><td class="best">0.9862</td><td class="best">37.4321</td><td class="best">3.2502</td><td class="second">0.9542</td><td class="best">34.0711</td><td class="best">3.6675</td><td class="best">0.9372</td><td class="best">31.8471</td></tr>
+<tr><td>Config. #1 (Shallow Only)</td><td>6.0479</td><td>0.9852</td><td>35.9776</td><td>3.6449</td><td>0.9515</td><td>32.5604</td><td>4.1722</td><td>0.9332</td><td>30.2424</td></tr>
+<tr><td>Config. #2 (Middle Only)</td><td>5.5084</td><td class="second">0.9858</td><td>36.8616</td><td>3.4796</td><td class="second">0.9542</td><td>33.7787</td><td>3.9229</td><td class="second">0.9369</td><td>31.4653</td></tr>
+<tr class="ours"><td>Config. #3 (Deep Only)</td><td class="best">5.2107</td><td class="best">0.9862</td><td class="best">37.4321</td><td class="best">3.2502</td><td class="second">0.9542</td><td class="best">34.0711</td><td class="best">3.6675</td><td class="best">0.9372</td><td class="best">31.8471</td></tr>
 <tr class="group-start"><td>Config. #4 (Shallow &amp; Middle)</td><td>5.6130</td><td>0.9849</td><td>36.5651</td><td class="second">3.3170</td><td class="best">0.9545</td><td>33.6416</td><td>3.8253</td><td>0.9360</td><td>31.3321</td></tr>
 <tr><td>Config. #5 (Middle &amp; Deep)</td><td>5.4761</td><td>0.9857</td><td class="second">37.1288</td><td>3.3211</td><td>0.9518</td><td class="second">34.0083</td><td class="second">3.7688</td><td>0.9341</td><td class="second">31.7260</td></tr>
 <tr><td>Config. #6 (All Stages)</td><td class="second">5.4430</td><td>0.9854</td><td>36.8779</td><td>3.3861</td><td>0.9540</td><td>33.6865</td><td>3.8286</td><td>0.9361</td><td>31.3961</td></tr>
-<tr class="group-start"><td>Without L<sub>fr</sub></td><td>6.0975</td><td>0.9849</td><td>35.4867</td><td>3.7747</td><td>0.9533</td><td>31.7673</td><td>4.2855</td><td>0.9347</td><td>29.6694</td></tr>
+<tr class="group-start"><td>Without \(\mathcal{L}_{fr}\)</td><td>6.0975</td><td>0.9849</td><td>35.4867</td><td>3.7747</td><td>0.9533</td><td>31.7673</td><td>4.2855</td><td>0.9347</td><td>29.6694</td></tr>
 </tbody>
 </table>
 </div>
-      <p class="table-caption">Contribution of each loss (Config. #3)</p>
+
+      <h3 class="subsection">Contribution of Each Loss</h3>
+      <div class="content has-text-justified">
+        <p>
+          \(\mathcal{L}_{LaMa}\) is the original LaMa objective (adversarial, HRFPL, feature matching, and L1 losses).
+          Adding \(\mathcal{L}_{mix}\), which compares luminance and contrast, mainly reduces the color difference in the
+          non-shadow region, while adding \(\mathcal{L}_{fr}\) gives a higher PSNR in the shadow region and over the whole
+          image. Combining both achieves the best performance in all regions and metrics.
+        </p>
+      </div>
+      <p class="table-caption"><span class="fig-no">Table 5.</span> Effect of \(\mathcal{L}_{mix}\) and
+        \(\mathcal{L}_{fr}\) (Config. #3, ISTD+).</p>
       <div class="results-table-wrapper">
 <table class="results-table">
 <thead>
-  <tr><th rowspan="2"></th><th rowspan="2">L<sub>LaMa</sub></th><th rowspan="2">L<sub>mix</sub></th><th rowspan="2">L<sub>fr</sub></th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th></tr>
-  <tr><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th></tr>
+<tr><th rowspan="2"></th><th rowspan="2">\(\mathcal{L}_{LaMa}\)</th><th rowspan="2">\(\mathcal{L}_{mix}\)</th><th rowspan="2">\(\mathcal{L}_{fr}\)</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th></tr>
+<tr><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th></tr>
 </thead>
 <tbody>
-<tr><td></td><td>✓</td><td></td><td></td><td>7.4366</td><td>0.9774</td><td>34.0190</td><td>5.1019</td><td>0.9249</td><td>29.7530</td><td>5.6161</td><td>0.8976</td><td>27.8767</td></tr>
-<tr><td></td><td>✓</td><td>✓</td><td></td><td class="second">6.0975</td><td class="second">0.9849</td><td>35.4867</td><td class="second">3.7747</td><td class="second">0.9533</td><td class="second">31.7673</td><td class="second">4.2855</td><td class="second">0.9347</td><td>29.6694</td></tr>
-<tr><td></td><td>✓</td><td></td><td>✓</td><td>6.4203</td><td>0.9827</td><td class="second">35.6343</td><td>4.1685</td><td>0.9472</td><td>31.5645</td><td>4.6311</td><td>0.9263</td><td class="second">29.7403</td></tr>
-<tr class="ours"><td></td><td>✓</td><td>✓</td><td>✓</td><td class="best">5.2107</td><td class="best">0.9862</td><td class="best">37.4321</td><td class="best">3.2502</td><td class="best">0.9542</td><td class="best">34.0711</td><td class="best">3.6675</td><td class="best">0.9372</td><td class="best">31.8471</td></tr>
+<tr><td></td><td>&#10003;</td><td></td><td></td><td>7.4366</td><td>0.9774</td><td>34.0190</td><td>5.1019</td><td>0.9249</td><td>29.7530</td><td>5.6161</td><td>0.8976</td><td>27.8767</td></tr>
+<tr><td></td><td>&#10003;</td><td>&#10003;</td><td></td><td class="second">6.0975</td><td class="second">0.9849</td><td>35.4867</td><td class="second">3.7747</td><td class="second">0.9533</td><td class="second">31.7673</td><td class="second">4.2855</td><td class="second">0.9347</td><td>29.6694</td></tr>
+<tr><td></td><td>&#10003;</td><td></td><td>&#10003;</td><td>6.4203</td><td>0.9827</td><td class="second">35.6343</td><td>4.1685</td><td>0.9472</td><td>31.5645</td><td>4.6311</td><td>0.9263</td><td class="second">29.7403</td></tr>
+<tr class="ours"><td></td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td class="best">5.2107</td><td class="best">0.9862</td><td class="best">37.4321</td><td class="best">3.2502</td><td class="best">0.9542</td><td class="best">34.0711</td><td class="best">3.6675</td><td class="best">0.9372</td><td class="best">31.8471</td></tr>
 </tbody>
 </table>
 </div>
-      <p class="table-note">
-        L<sub>LaMa</sub> is the original LaMa objective (adversarial, HRFPL, feature matching, and L1). L<sub>mix</sub>
-        mainly helps the non-shadow region, L<sub>fr</sub> gives a higher PSNR in the shadow region and over the whole
-        image, and combining both is best in every region and metric.
-      </p>
 
-      <div class="figure-block narrow">
-        <img src="assets/figures/fig3.svg" alt="Feature maps of the 20th FFC block without and with the feature refinement loss" loading="lazy">
-        <p class="figure-caption">Feature maps of the 20th FFC block (a) without and (b) with L<sub>fr</sub>. With L<sub>fr</sub>, the maps are more spatially coherent and richer in texture.</p>
-      </div>
-
-      <div class="image-grid cols-4">
+      <div class="image-grid">
         <img src="assets/figures/fig7/fig7_00.svg" alt="Shadow image" loading="lazy">
-        <img src="assets/figures/fig7/fig7_01.svg" alt="Result with feature refinement loss" loading="lazy">
-        <img src="assets/figures/fig7/fig7_02.svg" alt="Result without feature refinement loss" loading="lazy">
+        <img src="assets/figures/fig7/fig7_01.svg" alt="Result with the feature refinement loss" loading="lazy">
+        <img src="assets/figures/fig7/fig7_02.svg" alt="Result without the feature refinement loss" loading="lazy">
         <img src="assets/figures/fig7/fig7_03.svg" alt="Ground truth" loading="lazy">
-        <img src="assets/figures/fig7/fig7_10.svg" alt="Residual of the shadow image" loading="lazy">
-        <img src="assets/figures/fig7/fig7_11.svg" alt="Residual with feature refinement loss" loading="lazy">
-        <img src="assets/figures/fig7/fig7_12.svg" alt="Residual without feature refinement loss" loading="lazy">
-        <img src="assets/figures/fig7/fig7_13.svg" alt="Residual of the ground truth" loading="lazy">
-        <div class="grid-label">(a) I<sub>s</sub></div>
-        <div class="grid-label">(b) With L<sub>fr</sub></div>
-        <div class="grid-label">(c) Without L<sub>fr</sub></div>
-        <div class="grid-label">(d) I<sub>gt</sub></div>
+        <img src="assets/figures/fig7/fig7_10.svg" alt="Matte of the shadow image" loading="lazy">
+        <img src="assets/figures/fig7/fig7_11.svg" alt="Matte with the feature refinement loss" loading="lazy">
+        <img src="assets/figures/fig7/fig7_12.svg" alt="Matte without the feature refinement loss" loading="lazy">
+        <img src="assets/figures/fig7/fig7_13.svg" alt="Matte of the ground truth" loading="lazy">
+        <div class="grid-label">(a) \(I_S\)</div>
+        <div class="grid-label">(b) With \(\mathcal{L}_{fr}\)</div>
+        <div class="grid-label">(c) Without \(\mathcal{L}_{fr}\)</div>
+        <div class="grid-label">(d) \(I_{gt}\)</div>
       </div>
-      <p class="figure-caption">Images (top) and residual mattes with respect to the ground truth (bottom). With L<sub>fr</sub>, the residual left by the shadow is smaller and follows the ground-truth structure.</p>
+      <p class="figure-caption">
+        <span class="fig-no">Figure 7.</span> Matte images of the residuals with respect to the ground truth. With
+        \(\mathcal{L}_{fr}\), the residual left by the shadow is smaller and more consistent with the ground-truth structure.
+      </p>
     </div>
   </section>
 
   <!-- Post-processing -->
   <section id="post-processing" class="section">
     <div class="container is-max-desktop">
-      <h2 class="title is-3">Color Restoration Post-Processing</h2>
+      <h2 class="title is-3">Post-Processing Analysis</h2>
       <div class="content has-text-justified">
         <p>
-          We compare six color-mapping algorithms in BGR and LAB space, each fitted on the non-shadow region of every image.
-          Linear regression in BGR space lowers the whole-image RMSE on ISTD+ from 3.6675 to 3.4627 in 0.068 s. Gradient
-          boosting is slightly better on the non-shadow region and the whole image but takes about 2.5 s per image, so
-          linear regression is the default. Histogram matching, color transfer, and gamma correction barely change the
-          non-shadow region but raise the shadow-region RMSE from 5.2 to 8.4–10.8.
+          We compare six algorithms (linear regression, polynomial regression, histogram matching, color transfer,
+          gradient boosting, and gamma correction) in the BGR and LAB color spaces. Post-processing in BGR space generally
+          works better than in LAB space. Linear regression in BGR space, our default, reduces the whole-image RMSE from
+          3.6675 to 3.4627 and the shadow-region RMSE from 5.2107 to 4.9750; similar improvements are observed on SRD.
+          Gradient boosting in BGR space scores slightly higher, but on SRD it takes about 2.517 s per image compared
+          with 0.046 s for linear regression, a 54-fold increase in processing time, so linear regression offers the best
+          trade-off between performance and efficiency.
         </p>
       </div>
-      <p class="table-caption">Post-processing on ISTD+</p>
+      <p class="table-caption"><span class="fig-no">Table 6.</span> Post-processing techniques on the ISTD+ dataset.</p>
       <div class="results-table-wrapper">
 <table class="results-table">
 <thead>
-  <tr><th rowspan="2">Post-processing</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th><th rowspan="2">Time (s)</th></tr>
-  <tr><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th><th>RMSE↓</th><th>SSIM↑</th><th>PSNR↑</th></tr>
+<tr><th rowspan="2">Method</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th><th rowspan="2">Time (s)</th></tr>
+<tr><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th></tr>
 </thead>
 <tbody>
-<tr><td>SFR-Net (no post-processing)</td><td>5.2107</td><td class="second">0.9862</td><td>37.4321</td><td>3.2502</td><td>0.9542</td><td>34.0711</td><td>3.6675</td><td>0.9372</td><td>31.8471</td><td>–</td></tr>
-<tr class="ours group-start"><td>+ Linear regression (BGR, ours)</td><td class="best">4.9750</td><td class="best">0.9865</td><td class="best">37.8747</td><td class="second">3.0631</td><td>0.9550</td><td>34.5793</td><td>3.4627</td><td class="second">0.9382</td><td>32.3872</td><td>0.068</td></tr>
-<tr><td>+ Polynomial regression (BGR)</td><td>5.2444</td><td>0.9860</td><td>37.6492</td><td>3.2386</td><td>0.9553</td><td>34.3712</td><td>3.6599</td><td>0.9380</td><td>32.1919</td><td>0.187</td></tr>
-<tr><td>+ Histogram matching (BGR)</td><td>10.8398</td><td>0.9698</td><td>32.9278</td><td>3.2208</td><td>0.9541</td><td>34.2324</td><td>5.0366</td><td>0.9185</td><td>29.9032</td><td>0.050</td></tr>
-<tr><td>+ Color transfer (BGR)</td><td>9.2768</td><td>0.9760</td><td>33.6943</td><td>3.2208</td><td>0.9541</td><td>34.2324</td><td>4.5661</td><td>0.9260</td><td>30.3646</td><td>0.056</td></tr>
-<tr><td>+ Gradient boosting (BGR)</td><td>5.0741</td><td class="second">0.9862</td><td>37.7767</td><td class="best">2.9127</td><td class="best">0.9563</td><td class="second">35.0749</td><td class="best">3.3700</td><td class="best">0.9390</td><td class="best">32.6578</td><td>2.513</td></tr>
-<tr><td>+ Gamma correction (BGR)</td><td>8.4250</td><td>0.9806</td><td>34.8413</td><td>3.2208</td><td>0.9541</td><td>34.2324</td><td>4.3524</td><td>0.9300</td><td>30.9087</td><td>0.043</td></tr>
-<tr class="group-start"><td>+ Linear regression (LAB)</td><td class="second">5.0013</td><td>0.9857</td><td class="second">37.7963</td><td>3.1621</td><td>0.9505</td><td>34.3575</td><td>3.5482</td><td>0.9326</td><td>32.2254</td><td>0.054</td></tr>
-<tr><td>+ Gradient boosting (LAB)</td><td>5.0753</td><td class="second">0.9862</td><td>37.7766</td><td class="best">2.9127</td><td class="second">0.9562</td><td class="best">35.0753</td><td class="second">3.3712</td><td class="best">0.9390</td><td class="second">32.6574</td><td>1.937</td></tr>
+<tr><td>SFR-Net (default)</td><td>5.2107</td><td class="second">0.9862</td><td>37.4321</td><td>3.2502</td><td>0.9542</td><td>34.0711</td><td>3.6675</td><td>0.9372</td><td>31.8471</td><td>–</td></tr>
+<tr class="section-row"><td colspan="11">BGR space</td></tr>
+<tr class="ours"><td>+ Linear regression</td><td class="best">4.9750</td><td class="best">0.9865</td><td class="best">37.8747</td><td class="second">3.0631</td><td>0.9550</td><td>34.5793</td><td>3.4627</td><td class="second">0.9382</td><td>32.3872</td><td>0.068</td></tr>
+<tr><td>+ Polynomial regression</td><td>5.2444</td><td>0.9860</td><td>37.6492</td><td>3.2386</td><td>0.9553</td><td>34.3712</td><td>3.6599</td><td>0.9380</td><td>32.1919</td><td>0.187</td></tr>
+<tr><td>+ Histogram matching</td><td>10.8398</td><td>0.9698</td><td>32.9278</td><td>3.2208</td><td>0.9541</td><td>34.2324</td><td>5.0366</td><td>0.9185</td><td>29.9032</td><td>0.050</td></tr>
+<tr><td>+ Color transfer</td><td>9.2768</td><td>0.976</td><td>33.6943</td><td>3.2208</td><td>0.9541</td><td>34.2324</td><td>4.5661</td><td>0.9260</td><td>30.3646</td><td>0.056</td></tr>
+<tr><td>+ Gradient boosting</td><td>5.0741</td><td class="second">0.9862</td><td>37.7767</td><td class="best">2.9127</td><td class="best">0.9563</td><td class="second">35.0749</td><td class="best">3.3700</td><td class="best">0.9390</td><td class="best">32.6578</td><td>2.513</td></tr>
+<tr><td>+ Gamma correction</td><td>8.4250</td><td>0.9806</td><td>34.8413</td><td>3.2208</td><td>0.9541</td><td>34.2324</td><td>4.3524</td><td>0.9300</td><td>30.9087</td><td>0.043</td></tr>
+<tr class="section-row"><td colspan="11">LAB space</td></tr>
+<tr><td>+ Linear regression</td><td class="second">5.0013</td><td>0.9857</td><td class="second">37.7963</td><td>3.1621</td><td>0.9505</td><td>34.3575</td><td>3.5482</td><td>0.9326</td><td>32.2254</td><td>0.054</td></tr>
+<tr><td>+ Polynomial regression</td><td>5.1281</td><td>0.9853</td><td>37.6323</td><td>3.3148</td><td>0.9501</td><td>34.0300</td><td>3.6971</td><td>0.9319</td><td>31.9582</td><td>0.158</td></tr>
+<tr><td>+ Histogram matching</td><td>11.5396</td><td>0.9672</td><td>32.3056</td><td>3.2834</td><td>0.9523</td><td>34.1094</td><td>5.2168</td><td>0.9139</td><td>29.5462</td><td>0.059</td></tr>
+<tr><td>+ Color transfer</td><td>9.4752</td><td>0.9755</td><td>33.5719</td><td>3.2834</td><td>0.9523</td><td>34.1094</td><td>4.6691</td><td>0.9227</td><td>30.2466</td><td>0.059</td></tr>
+<tr><td>+ Gradient boosting</td><td>5.0753</td><td class="second">0.9862</td><td>37.7766</td><td class="best">2.9127</td><td class="second">0.9562</td><td class="best">35.0753</td><td class="second">3.3712</td><td class="best">0.9390</td><td class="second">32.6574</td><td>1.937</td></tr>
+<tr><td>+ Gamma correction</td><td>8.5674</td><td>0.9792</td><td>34.7292</td><td>3.2834</td><td>0.9523</td><td>34.1094</td><td>4.4338</td><td>0.9267</td><td>30.7879</td><td>0.048</td></tr>
 </tbody>
 </table>
 </div>
+      <p class="table-caption"><span class="fig-no">Table 7.</span> Post-processing techniques on the SRD dataset.</p>
+      <div class="results-table-wrapper">
+<table class="results-table">
+<thead>
+<tr><th rowspan="2">Method</th><th colspan="3">Shadow Region</th><th colspan="3">Non-Shadow Region</th><th colspan="3">All</th><th rowspan="2">Time (s)</th></tr>
+<tr><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th><th>RMSE&darr;</th><th>SSIM&uarr;</th><th>PSNR&uarr;</th></tr>
+</thead>
+<tbody>
+<tr><td>SFR-Net (default)</td><td>3.7840</td><td>0.9719</td><td>32.9293</td><td>2.5129</td><td>0.9690</td><td>33.5797</td><td>5.2807</td><td>0.9266</td><td>29.4810</td><td>–</td></tr>
+<tr class="section-row"><td colspan="11">BGR space</td></tr>
+<tr class="ours"><td>+ Linear regression</td><td>3.5184</td><td class="best">0.9744</td><td>33.1909</td><td>1.9665</td><td>0.9727</td><td>33.7399</td><td>4.3781</td><td class="second">0.9341</td><td>29.8287</td><td>0.046</td></tr>
+<tr><td>+ Polynomial regression</td><td>3.8751</td><td>0.9719</td><td>32.8250</td><td>2.4020</td><td>0.9703</td><td>33.6360</td><td>5.1542</td><td>0.9277</td><td>29.4965</td><td>0.146</td></tr>
+<tr><td>+ Histogram matching</td><td>6.8171</td><td>0.9445</td><td>28.2236</td><td>1.9761</td><td class="second">0.9743</td><td>33.7197</td><td>6.9081</td><td>0.9037</td><td>26.4355</td><td>0.030</td></tr>
+<tr><td>+ Color transfer</td><td>6.0244</td><td>0.9515</td><td>29.0468</td><td>1.9754</td><td class="second">0.9743</td><td>33.7206</td><td>6.2467</td><td>0.9106</td><td>27.0794</td><td>0.036</td></tr>
+<tr><td>+ Gradient boosting</td><td class="second">3.4189</td><td class="second">0.9731</td><td class="best">33.4204</td><td class="best">1.7751</td><td class="best">0.9754</td><td class="best">34.8569</td><td class="best">4.1269</td><td class="best">0.9346</td><td class="best">30.4812</td><td>2.517</td></tr>
+<tr><td>+ Gamma correction</td><td>5.4126</td><td>0.9579</td><td>29.9249</td><td>1.9748</td><td class="second">0.9743</td><td>33.7221</td><td>5.7732</td><td>0.9175</td><td>27.6969</td><td>0.022</td></tr>
+<tr class="section-row"><td colspan="11">LAB space</td></tr>
+<tr><td>+ Linear regression</td><td>3.5340</td><td>0.9720</td><td>33.0943</td><td>2.1449</td><td>0.9710</td><td>33.7517</td><td>4.6310</td><td>0.9288</td><td>29.7129</td><td>0.052</td></tr>
+<tr><td>+ Polynomial regression</td><td>3.6287</td><td>0.9716</td><td>32.8703</td><td>2.1404</td><td>0.9707</td><td>33.7016</td><td>4.6761</td><td>0.9283</td><td>29.5851</td><td>0.158</td></tr>
+<tr><td>+ Histogram matching</td><td>6.8738</td><td>0.9438</td><td>28.0923</td><td>1.9940</td><td>0.9738</td><td>33.6939</td><td>6.9104</td><td>0.9024</td><td>26.3554</td><td>0.034</td></tr>
+<tr><td>+ Color transfer</td><td>6.0680</td><td>0.9509</td><td>28.9820</td><td>1.9938</td><td>0.9738</td><td>33.6943</td><td>6.2952</td><td>0.9094</td><td>27.0294</td><td>0.040</td></tr>
+<tr><td>+ Gradient boosting</td><td class="best">3.4049</td><td>0.9725</td><td class="second">33.3698</td><td class="second">1.8277</td><td>0.9732</td><td class="second">34.6197</td><td class="second">4.1727</td><td>0.9314</td><td class="second">30.3473</td><td>1.979</td></tr>
+<tr><td>+ Gamma correction</td><td>5.4568</td><td>0.9556</td><td>29.8500</td><td>1.9932</td><td>0.9738</td><td>33.6958</td><td>5.8259</td><td>0.9147</td><td>27.6307</td><td>0.028</td></tr>
+</tbody>
+</table>
+</div>
+
       <div class="figure-block">
-        <img src="assets/figures/fig8/fig8-abc.svg" alt="Blue, green, and red pixel histograms with and without post-processing" loading="lazy">
+        <img src="assets/figures/fig8/fig8-abc.svg" alt="Blue, green, and red pixel histograms" loading="lazy">
       </div>
-      <div class="image-grid cols-4">
+      <div class="image-grid">
         <img src="assets/figures/fig8/fig8-d.svg" alt="Ground truth" loading="lazy">
         <img src="assets/figures/fig8/fig8-e.svg" alt="Shadow image" loading="lazy">
         <img src="assets/figures/fig8/fig8-f.svg" alt="SFR-Net output before post-processing" loading="lazy">
         <img src="assets/figures/fig8/fig8-g.svg" alt="SFR-Net output after post-processing" loading="lazy">
-        <div class="grid-label">(d) I<sub>gt</sub></div>
-        <div class="grid-label">(e) I<sub>s</sub></div>
-        <div class="grid-label">(f) I<sub>sf</sub></div>
-        <div class="grid-label">(g) I<sub>sf-pp</sub></div>
+        <div class="grid-label">(d) \(I_{gt}\)</div>
+        <div class="grid-label">(e) \(I_S\)</div>
+        <div class="grid-label">(f) \(I_{sf}\)</div>
+        <div class="grid-label">(g) \(I_{sf\text{-}pp}\)</div>
       </div>
-      <p class="figure-caption">(a–c) Blue, green, and red histograms. After post-processing, the color distribution of the output follows the ground truth more closely.</p>
+      <p class="figure-caption">
+        <span class="fig-no">Figure 8.</span> Color histograms with and without post-processing: (a) blue, (b) green,
+        (c) red. After linear-regression post-processing, the distribution aligns more closely with the ground truth.
+      </p>
+
       <div class="figure-block">
         <img src="assets/figures/fig9.svg" alt="Qualitative comparison of post-processing algorithms" loading="lazy">
         <p class="figure-caption">
-          Columns from left to right: I<sub>sf</sub>, linear regression, polynomial regression, color transfer (Reinhard
-          et al.), gradient boosting, gamma correction, I<sub>s</sub>. Linear regression blends the former shadow region
-          into its surroundings without color artifacts.
+          <span class="fig-no">Figure 9.</span> Post-processing algorithms for color restoration. (a) \(I_{sf}\),
+          (b) linear regression, (c) polynomial regression, (d) color transfer (Reinhard et al.), (e) gradient boosting,
+          (f) gamma correction, (g) \(I_S\), from left to right. Linear regression blends the previously shadowed and
+          non-shadowed regions seamlessly, while histogram matching and color transfer can introduce color artifacts.
         </p>
       </div>
     </div>
   </section>
 
   <!-- Conclusion -->
-  <section class="section hero is-light">
+  <section id="conclusion" class="section hero is-light">
     <div class="container is-max-desktop">
-      <h2 class="title is-3">Takeaways</h2>
-      <div class="content">
-        <ol class="takeaway-list">
-          <li><b>Inpainting priors transfer to shadow removal.</b> Initializing from LaMa and distilling a frozen LaMa that reconstructs the ground truth gives G<sub>S</sub> a strong target in feature space.</li>
-          <li><b>Refine late, not early.</b> Feature refinement helps most in the deep FFC blocks, where the shadow image and mask features have converged.</li>
-          <li><b>Fix color outside the network.</b> A per-image linear regression on the non-shadow region removes the global color shift learned from mismatched training pairs at negligible cost.</li>
-        </ol>
-        <p class="is-size-6">
-          <b>Limitations.</b> The model is trained on ISTD+ and SRD and may not generalize to unseen lighting, object types,
-          noisy backgrounds, or complex overlapping shadows. It requires paired data and a shadow mask at test time, and the
-          post-processing step is separate from the network and is not optimized jointly with it.
+      <h2 class="title is-3">Conclusion</h2>
+      <div class="content has-text-justified">
+        <p>
+          SFR-Net learns shadow removal through knowledge distillation of feature maps: the ground-truth image is passed
+          through a pretrained inpainting network, and its features supervise those of the shadow removal network. Together
+          with the MS-SSIM, L1, and feature refinement losses and a linear-regression post-processing for color restoration,
+          SFR-Net effectively reconstructs shadow-free images.
+        </p>
+        <p>
+          The method has several limitations. The model is trained on ISTD+ and SRD and may not generalize to unseen
+          lighting conditions, object types, noisy backgrounds, or complex overlapping shadows. It depends on paired data,
+          and the post-processing step is separate from the network and is not optimized jointly. Future work will explore
+          self-supervised or weakly supervised learning to reduce the dependence on paired data, and an end-to-end
+          architecture that integrates color correction into the network.
         </p>
       </div>
     </div>

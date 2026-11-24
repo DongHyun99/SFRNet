@@ -1,14 +1,63 @@
-/* Page-specific styles on top of the Academic Project Page Template. */
+/* SFR-Net project page, on top of the Academic Project Page Template. */
 
-.tldr {
-  font-size: 1.15rem;
-  line-height: 1.7;
-  max-width: 900px;
-  margin: 1.5rem auto 0;
+h1.title.publication-title {
+  font-family: 'Google Sans', sans-serif !important;
+  font-size: 2.3rem !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
 }
 
+.venue-link {
+  display: inline-block;
+  margin-top: 1rem;
+}
+
+.hf-icon {
+  width: 1.1em;
+  height: auto;
+}
+
+/* In-page navigation */
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 1.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.page-nav a {
+  color: var(--text-secondary);
+}
+
+.page-nav a:hover {
+  color: var(--primary-color);
+}
+
+/* Headings inside a section, numbered like the paper */
+h3.subsection {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 2.25rem 0 0.75rem;
+}
+
+h4.paragraph-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.4rem;
+}
+
+.content p {
+  line-height: 1.75;
+}
+
+/* Figures */
 .figure-block {
-  margin: 1.5rem 0;
+  margin: 1.75rem auto;
 }
 
 .figure-block img {
@@ -18,79 +67,68 @@
   margin: 0 auto;
 }
 
-.figure-block.narrow img {
-  max-width: 720px;
-}
+.figure-block.w-80 img { max-width: 80%; }
+.figure-block.w-60 img { max-width: 60%; }
 
 .figure-caption {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: var(--text-secondary);
   text-align: center;
   margin-top: 0.75rem;
 }
 
-.question-callout {
-  border-left: 4px solid var(--primary-color);
-  background: var(--background-secondary);
-  padding: 1rem 1.25rem;
-  margin: 1.5rem 0;
-  font-size: 1.15rem;
-  font-weight: 600;
-}
-
-.component-card {
-  height: 100%;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  padding: 1.25rem;
-  background: var(--background-primary);
-}
-
-.component-card h3 {
-  font-size: 1.1rem;
+.figure-caption .fig-no {
   font-weight: 700;
-  margin-bottom: 0.5rem;
+  color: var(--text-primary);
 }
 
-.equation {
-  font-family: 'Times New Roman', serif;
-  font-size: 1.15rem;
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin: 1.75rem auto 0;
+}
+
+.image-grid img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.image-grid .grid-label {
+  font-size: 0.9rem;
   text-align: center;
-  margin: 1.25rem 0;
-}
-
-.stat-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1rem;
-  margin: 1.5rem 0;
-}
-
-.stat {
-  flex: 1 1 180px;
-  max-width: 240px;
-  text-align: center;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  padding: 1rem;
-}
-
-.stat .value {
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--primary-color);
-  line-height: 1.2;
-}
-
-.stat .label {
-  font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+/* Equations */
+.equation {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.contribution-list li {
+  margin-bottom: 0.6rem;
+}
+
+.setup-list li {
+  margin-bottom: 0.35rem;
+}
+
+/* Tables */
+.table-caption {
+  font-size: 0.95rem;
+  margin: 1.75rem 0 0.5rem;
+}
+
+.table-caption .fig-no {
+  font-weight: 700;
 }
 
 .results-table-wrapper {
   overflow-x: auto;
-  margin: 1rem 0;
+  margin: 0.5rem 0 1rem;
 }
 
 table.results-table {
@@ -112,7 +150,8 @@ table.results-table td:first-child {
   text-align: left;
 }
 
-table.results-table thead tr:last-child th {
+table.results-table thead tr:last-child th,
+table.results-table thead th[rowspan] {
   border-bottom: 2px solid var(--text-primary);
 }
 
@@ -120,8 +159,16 @@ table.results-table tr.group-start td {
   border-top: 2px solid var(--border-color);
 }
 
+table.results-table tr.section-row td {
+  font-weight: 700;
+  background: var(--background-secondary);
+}
+
 table.results-table tr.ours td {
   background: #eff6ff;
+}
+
+table.results-table tr.ours td:first-child {
   font-weight: 700;
 }
 
@@ -138,70 +185,17 @@ table.results-table td.second {
   text-decoration: underline;
 }
 
-.table-caption {
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin-top: 1.5rem;
-}
-
-.table-note {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.image-grid {
-  display: grid;
-  gap: 0.5rem;
-  margin: 1rem 0 0.5rem;
-}
-
-.image-grid.cols-4 {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.image-grid img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.image-grid .grid-label {
-  font-size: 0.9rem;
-  text-align: center;
-  color: var(--text-secondary);
-}
-
-.takeaway-list li {
-  margin-bottom: 0.75rem;
-}
-
-.teaser .hero-body {
-  padding-top: 0;
-}
-
-.hf-icon {
-  width: 1.1em;
-  height: auto;
-}
-
-.venue-link {
-  display: inline-block;
-  margin-top: 1rem;
-}
-
-h1.title.publication-title {
-  font-family: 'Google Sans', sans-serif !important;
-  font-size: 2.4rem !important;
-  font-weight: 600 !important;
-  line-height: 1.3 !important;
-}
-
 @media screen and (max-width: 768px) {
   h1.title.publication-title {
-    font-size: 1.7rem !important;
+    font-size: 1.6rem !important;
   }
 
-  .image-grid.cols-4 {
+  .figure-block.w-80 img,
+  .figure-block.w-60 img {
+    max-width: 100%;
+  }
+
+  .image-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
