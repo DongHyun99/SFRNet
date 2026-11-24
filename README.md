@@ -13,6 +13,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2610.05325-b31b1b.svg)](https://arxiv.org/abs/2610.05325)
 [![Journal](https://img.shields.io/badge/Multimedia_Systems-10.1007%2Fs00530--025--02036--5-blue.svg)](https://doi.org/10.1007/s00530-025-02036-5)
 [![Weights](https://img.shields.io/badge/%F0%9F%A4%97_Hugging_Face-Weights-yellow.svg)](https://huggingface.co/Donghyun99/SFRNet)
+[![Project Page](https://img.shields.io/badge/Project_Page-blue.svg)](https://donghyun99.github.io/SFRNet/)
 
 </div>
 
@@ -59,7 +60,7 @@ perceptually natural shadow removal.
 ## 💡 Method
 
 <p align="center">
-  <a href="assets/figures/fig1.pdf"><img src="assets/figures/fig1.svg" alt="Network architecture of SFR-Net" width="85%"></a>
+  <a href="assets/figures/fig1.pdf"><img src="assets/figures/fig1.svg" alt="Network architecture of SFR-Net" width="60%"></a>
 </p>
 <p align="center"><sub>Network architecture of the proposed shadow feature refinement network.</sub></p>
 
