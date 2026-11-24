@@ -1,0 +1,45 @@
+# SFR-Net on SRD. SRD has no official masks: use DHAN-predicted masks and resize all images to 640x480
+# (see README "Datasets").
+
+model:
+  init_checkpoint: pretrained/big-lama/models/best.ckpt
+  guiding_checkpoint: pretrained/big-lama/models/best.ckpt
+  ade20k_weights_dir: pretrained
+
+data:
+  root: datasets/SRD
+  batch_size: 4
+  num_workers: 4
+  train:
+    shadow_dir: ${data.root}/train/train_A
+    mask_dir: ${data.root}/train/train_B
+    gt_dir: ${data.root}/train/train_C
+    crop_size: null
+    hflip: false
+  val:
+    shadow_dir: ${data.root}/test/test_A
+    mask_dir: ${data.root}/test/test_B
+    gt_dir: ${data.root}/test/test_C
+    max_images: null
+    num_samples: 8
+
+optimizers:
+  generator: {kind: adam, lr: 0.001}
+  discriminator: {kind: adam, lr: 0.0001}
+
+losses:
+  adversarial: {weight: 10, gp_coef: 0.001}
+  hrfpl: {weight: 30}
+  feature_matching: {weight: 100}
+  mix: {alpha: 0.025, weight_known: 10, weight_missing: 0}
+  feature_refinement: {weight: 100, stages: [deep]}
+
+trainer:
+  out_dir: experiments/sfrnet_srd
+  device: cuda
+  seed: 0
+  max_epochs: 80
+  val_every_n_epochs: 2
+  monitor: rmse_all
+  gradient_clip_val: 1.0
+  log_every_n_steps: 50

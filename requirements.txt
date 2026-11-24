@@ -1,0 +1,9 @@
+torch>=2.0
+numpy
+opencv-python
+omegaconf>=2.1
+scikit-image>=0.19
+tensorboard
+tqdm
+# optional: Lion optimizer (optimizers.*.kind: lion)
+# lion-pytorch

@@ -1,0 +1,20 @@
+# weights, data and outputs (SFR-Net weights are hosted on Hugging Face: Donghyun99/SFRNet)
+checkpoints/
+pretrained/
+datasets/
+experiments/
+results/
+*.ckpt
+*.pth
+
+# legacy research code this repository was extracted from
+LaMa-Shadow 2/
+
+# tooling
+.gjc/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.DS_Store

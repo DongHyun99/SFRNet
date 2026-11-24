@@ -1,0 +1,55 @@
+# SFR-Net on ISTD+ (paper setting, Config. #3: feature refinement on the deep stage).
+# Expected layout: <root>/train/{train_A,train_B,train_C}, <root>/test/{test_A,test_B,test_C}
+# (A: shadow image, B: shadow mask, C: shadow-free image; files matched by name).
+
+model:
+  init_checkpoint: pretrained/big-lama/models/best.ckpt  # LaMa big-lama, initializes G_S
+  guiding_checkpoint: pretrained/big-lama/models/best.ckpt  # guiding network G_I (frozen)
+  ade20k_weights_dir: pretrained                      # <dir>/ade20k/ade20k-resnet50dilated-ppm_deepsup/encoder_epoch_20.pth
+
+data:
+  root: datasets/ISTD+
+  batch_size: 4
+  num_workers: 4
+  train:
+    shadow_dir: ${data.root}/train/train_A
+    mask_dir: ${data.root}/train/train_B
+    gt_dir: ${data.root}/train/train_C
+    crop_size: null   # train on full 640x480 images
+    hflip: false
+  val:
+    shadow_dir: ${data.root}/test/test_A
+    mask_dir: ${data.root}/test/test_B
+    gt_dir: ${data.root}/test/test_C
+    max_images: null  # evaluate the whole split
+    num_samples: 8    # side-by-side images saved per validation
+
+optimizers:
+  generator: {kind: adam, lr: 0.001}
+  discriminator: {kind: adam, lr: 0.0001}
+
+losses:            # paper Eq. (1)
+  adversarial:
+    weight: 10       # alpha
+    gp_coef: 0.001   # zeta (R1)
+  hrfpl:
+    weight: 30       # beta
+  feature_matching:
+    weight: 100      # gamma
+  mix:               # delta, applied to non-shadow pixels (weight_known) / shadow pixels (weight_missing)
+    alpha: 0.025     # gamma_mix in Eq. (11)
+    weight_known: 10
+    weight_missing: 0
+  feature_refinement:
+    weight: 100      # lambda_fr
+    stages: [deep]   # any of shallow / middle / deep (paper Table 4)
+
+trainer:
+  out_dir: experiments/sfrnet_istd_plus
+  device: cuda
+  seed: 0
+  max_epochs: 80
+  val_every_n_epochs: 2
+  monitor: rmse_all
+  gradient_clip_val: 1.0
+  log_every_n_steps: 50
