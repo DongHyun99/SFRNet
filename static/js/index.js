@@ -1,5 +1,16 @@
 window.HELP_IMPROVE_VIDEOJS = false;
 
+// Render LaTeX with the self-hosted KaTeX (static/katex), loaded by the deferred scripts before this one
+document.addEventListener('DOMContentLoaded', function() {
+    renderMathInElement(document.body, {
+        delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '\\(', right: '\\)', display: false}
+        ],
+        throwOnError: false
+    });
+});
+
 // Copy BibTeX to clipboard
 function copyBibTeX() {
     const bibtexElement = document.getElementById('bibtex-code');
